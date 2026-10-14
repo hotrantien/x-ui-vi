@@ -186,6 +186,22 @@ open_firewall_port() {
     LOGI "Lưu ý: Oracle Cloud Security List/NSG phải được cho phép riêng trên web OCI."
 }
 
+open_default_firewall_ports() {
+    local port
+    local failures=0
+    LOGI "Đang tự mở TCP 54321, 80 và 443 trên firewall Ubuntu..."
+    for port in 54321 80 443; do
+        if ! open_firewall_port "$port" tcp; then
+            ((++failures))
+        fi
+    done
+    if (( failures )); then
+        LOGE "Không thể hoàn tất mở $failures cổng. Kiểm tra iptables và netfilter-persistent."
+        return 1
+    fi
+    LOGI "Đã xử lý các cổng mặc định TCP 54321, 80, 443."
+}
+
 uninstall() {
     confirm "Bạn có chắc muốn gỡ bảng điều khiển? Xray cũng sẽ bị gỡ." "n"
     if [[ $? != 0 ]]; then
@@ -531,7 +547,8 @@ show_usage() {
     echo "x-ui disable      - Tắt tự khởi động x-ui cùng hệ thống"
     echo "x-ui log          - Xem nhật ký x-ui"
     echo "x-ui v2-ui        - Chuyển dữ liệu tài khoản v2-ui sang x-ui trên máy này"
-    echo "x-ui open-port [cổng] [tcp|udp|both] - Mở cổng firewall Ubuntu"
+    echo "x-ui open-port             - Mở sẵn TCP 54321, 80, 443"
+    echo "x-ui open-port [cổng] [tcp|udp|both] - Mở thêm cổng riêng"
     echo "x-ui install [gói] - Cài đặt bảng điều khiển từ gói .tar.gz cục bộ"
     echo "x-ui uninstall    - Gỡ cài đặt bảng điều khiển x-ui"
     echo "------------------------------------------"
@@ -543,7 +560,7 @@ show_menu() {
   ${green}0.${plain} Thoát
 ————————————————
   ${green}1.${plain} Cài đặt x-ui
-  ${green}2.${plain} Mở cổng firewall (TCP/UDP)
+  ${green}2.${plain} Mở mặc định TCP 54321, 80, 443
   ${green}3.${plain} Gỡ cài đặt x-ui
 ————————————————
   ${green}4.${plain} Đặt lại tên tài khoản và mật khẩu
@@ -575,7 +592,7 @@ show_menu() {
         ;;
     2)
         if check_install; then
-            open_firewall_port
+            open_default_firewall_ports
             before_show_menu
         fi
         ;;
@@ -654,7 +671,13 @@ if [[ $# > 0 ]]; then
         check_install 0 && migrate_v2_ui 0
         ;;
     "open-port")
-        check_install 0 && open_firewall_port "${2:-}" "${3:-}"
+        if check_install 0; then
+            if [[ $# -eq 1 ]]; then
+                open_default_firewall_ports
+            else
+                open_firewall_port "${2:-}" "${3:-}"
+            fi
+        fi
         ;;
     "install")
         check_uninstall 0 && install 0 "${2:-}"

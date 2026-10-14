@@ -102,6 +102,7 @@ config_after_install() {
         /usr/local/x-ui/x-ui setting -username "${config_account}" -password "${config_password}" || return 1
         echo -e "${yellow}Đã đặt tên tài khoản và mật khẩu${plain}"
         /usr/local/x-ui/x-ui setting -port "${config_port}" || return 1
+        panel_port="$config_port"
         echo -e "${yellow}Đã đặt cổng bảng điều khiển${plain}"
     else
         echo -e "${red}Đã hủy. Các thiết lập vẫn giữ giá trị mặc định, vui lòng thay đổi sớm!${plain}"
@@ -111,6 +112,7 @@ config_after_install() {
 install_x-ui() {
     archive="${1:-${script_dir}/x-ui-linux-${arch}.tar.gz}"
     stage_dir=""
+    local panel_port=54321
     old_install=0 old_cli=0 old_unit=0 was_running=0 moved_old=0
     started_change=0 deployed=0 committed=0
 
@@ -285,6 +287,16 @@ install_x-ui() {
         echo -e "${green}Đã cập nhật x-ui. Giữ nguyên dữ liệu /etc/x-ui và chứng chỉ ngoài thư mục ứng dụng.${plain}"
     else
         echo -e "${green}Đã cài đặt mới x-ui.${plain}"
+        echo -e "${yellow}Đang tự mở cổng TCP 54321, 80, 443 trên firewall Ubuntu...${plain}"
+        if ! bash /usr/local/x-ui/x-ui.sh open-port; then
+            log_error "Không mở/lưu được đầy đủ cổng mặc định; xem lại iptables và netfilter-persistent."
+        fi
+        if [[ "$panel_port" != 54321 ]]; then
+            echo -e "${yellow}Đang mở thêm cổng quản trị đã chọn: $panel_port/tcp${plain}"
+            if ! bash /usr/local/x-ui/x-ui.sh open-port "$panel_port" tcp; then
+                log_error "Không mở/lưu được cổng quản trị $panel_port/tcp."
+            fi
+        fi
     fi
     if (( old_install )); then
         if (( ! was_running )); then
@@ -304,7 +316,7 @@ install_x-ui() {
     echo -e "x-ui disable      - Tắt tự khởi động x-ui cùng hệ thống"
     echo -e "x-ui log          - Xem nhật ký x-ui"
     echo -e "x-ui v2-ui        - Chuyển dữ liệu tài khoản v2-ui sang x-ui trên máy này"
-    echo -e "x-ui open-port    - Mở cổng firewall Ubuntu (TCP/UDP)"
+    echo -e "x-ui open-port    - Mở mặc định TCP 54321, 80, 443"
     echo -e "x-ui install      - Cài đặt bảng điều khiển x-ui"
     echo -e "x-ui uninstall    - Gỡ cài đặt bảng điều khiển x-ui"
     echo -e "----------------------------------------------"

@@ -1,6 +1,6 @@
 # x-ui VI — Cài một lần trên Oracle Cloud VPS, quản lý qua web
 
-**Bản dùng cố định: [`v0.3.2-vi.4`](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.4).**
+**Bản dùng cố định: [`v0.3.2-vi.5`](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.5).**
 
 Đây là bản Việt hóa x-ui tự đóng gói, có mã nguồn, giao diện, Xray Linux và
 `geoip.dat` / `geosite.dat` trong chính repository `hotrantien/x-ui-vi`.
@@ -41,7 +41,7 @@ set -o pipefail && curl -fsSL https://raw.githubusercontent.com/hotrantien/x-ui-
 ```
 
 Lệnh tải script khởi động từ repo của bạn và chạy trực tiếp bằng Bash. Script
-**cố định tag `v0.3.2-vi.4`**, tải gói từ [GitHub Releases của repository này](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.4),
+**cố định tag `v0.3.2-vi.5`**, tải gói từ [GitHub Releases của repository này](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.5),
 kiểm tra SHA-256 rồi cài panel và Xray. Không cần tải từ repo x-ui gốc hoặc
 tạo file cài trong thư mục hiện tại. Bạn cần **giữ phiên SSH mở trong lúc cài**
 để nhập tài khoản, mật khẩu và cổng. Sau khi hoàn tất có thể đóng SSH.
@@ -60,11 +60,12 @@ Khi được hỏi cấu hình, hãy nhập **`y`** rồi đặt:
 **Lưu ý:** `0.0.0.0` là **địa chỉ lắng nghe ở phía VPS**, không phải địa chỉ
 để nhập vào trình duyệt. Để truy cập, luôn dùng **IP công khai của VPS**.
 
-## 3. Mở ba cổng TCP trên Oracle Cloud (OCI)
+## 3. Các cổng TCP được mở tự động
 
-Chỉ cần mở **TCP `80`, `443` và `54321` một lần**. Sau này tạo VLESS qua web
-với cổng `80` hoặc `443`, không cần SSH trở lại để mở cổng. Cổng `54321` dành
-riêng cho panel (thay bằng cổng quản trị đã chọn nếu khác).
+Ngay sau khi **cài mới**, bộ cài tự thêm luật `iptables` cho **TCP `54321`,
+`80` và `443`**, không cần nhập từng cổng hoặc chạy thêm lệnh mở cổng. Nếu
+bạn đặt cổng web khác `54321`, bộ cài mở cả cổng đó. Bạn có thể tạo VLESS
+trên `80` hoặc `443` qua web sau này.
 
 **Trên Oracle Cloud:** bạn tự mở Ingress TCP `80`, `443` và cổng quản trị
 `54321` (nếu đổi cổng, mở cổng tương ứng) trong Security List/NSG. Giữ nguyên
@@ -78,27 +79,18 @@ nếu chưa hiểu cấu hình của image. Oracle cảnh báo thay đổi firew
 hưởng các quy tắc thiết yếu cho boot volume và làm VPS không khởi động được.
 Xem [Oracle Compute Best Practices](https://docs.oracle.com/en-us/iaas/Content/Compute/References/bestpracticescompute.htm).
 
-Sau khi cài, chạy **`sudo x-ui`** và chọn **`2. Mở cổng firewall (TCP/UDP)`**.
-Nhập cổng `80`, chọn `tcp`; sau đó lặp lại với `443` và `54321` (nếu
-cổng này đã mở thì menu sẽ bỏ qua, không tạo luật trùng).
-
-Hoặc mở cả ba cổng **một lần** từ SSH bằng các lệnh tương đương:
-
-```bash
-sudo x-ui open-port 80 tcp
-sudo x-ui open-port 443 tcp
-sudo x-ui open-port 54321 tcp
-```
-
-Menu chỉ thêm các luật `iptables` cần thiết vào `INPUT`, **không xóa các luật
-Oracle có sẵn**, và tự chạy `netfilter-persistent save` khi công cụ này đã
-có trên VPS. Để các luật còn hiệu lực sau **khởi động lại**, nếu menu báo chưa
-có `netfilter-persistent` thì cài công cụ lưu firewall một lần:
+Trên VPS mới, bộ cài chỉ thêm luật vào `INPUT`, **không xóa luật Oracle có
+sẵn**. Khi đã có `netfilter-persistent`, các luật được tự lưu để vẫn còn
+sau khởi động lại. Nếu bộ cài cảnh báo thiếu công cụ lưu firewall, chạy:
 
 ```bash
 sudo apt install -y iptables-persistent
 sudo netfilter-persistent save
 ```
+
+Nếu cần áp dụng lại các cổng mặc định, dùng **`sudo x-ui` → mục 2** hoặc
+`sudo x-ui open-port` (không nhập tham số). Lệnh chỉ thêm luật chưa có. Muốn
+mở một cổng khác riêng lẻ: `sudo x-ui open-port 8443 tcp`.
 
 Nếu máy dùng firewall riêng do `nftables` hay phần mềm khác quản lý, hãy cấu
 hình theo công cụ đó thay vì chèn luật vào hai hệ thống cùng lúc. Không thay
@@ -141,7 +133,7 @@ sudo /usr/local/x-ui/x-ui -v
 sudo systemctl status x-ui --no-pager
 ```
 
-Phiên bản mong đợi: `0.3.2-vi.4`. Khi cần xem lỗi:
+Phiên bản mong đợi: `0.3.2-vi.5`. Khi cần xem lỗi:
 
 ```bash
 sudo journalctl -u x-ui -n 50 --no-pager

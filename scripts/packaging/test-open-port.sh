@@ -64,6 +64,14 @@ open_firewall_port <<< $'54321\n\n'
 [[ "$insert_calls" == 4 && "$save_calls" == 3 ]]
 [[ "${rules[INPUT -p tcp --dport 54321 -j ACCEPT]:-}" == 1 ]]
 
+open_default_firewall_ports
+[[ "$insert_calls" == 4 && "$save_calls" == 3 ]]
+
+unset 'rules[INPUT -p tcp --dport 443 -j ACCEPT]'
+open_default_firewall_ports
+[[ "$insert_calls" == 5 && "$save_calls" == 4 ]]
+[[ "${rules[INPUT -p tcp --dport 443 -j ACCEPT]:-}" == 1 ]]
+
 for invalid in 0 -1 65536 999999 abc 01 '80/tcp'; do
     if open_firewall_port "$invalid" tcp >/dev/null 2>&1; then
         echo "Cổng không hợp lệ được chấp nhận: $invalid" >&2
@@ -74,20 +82,21 @@ if open_firewall_port 9000 unsupported >/dev/null 2>&1; then
     echo 'Giao thức không hợp lệ được chấp nhận' >&2
     exit 1
 fi
-[[ "$insert_calls" == 4 && "$save_calls" == 3 ]]
+[[ "$insert_calls" == 5 && "$save_calls" == 4 ]]
 
 persistence_error=1
 if open_firewall_port 9001 tcp >/dev/null 2>&1; then
     echo 'Báo thành công khi lưu firewall thất bại' >&2
     exit 1
 fi
-[[ "$insert_calls" == 5 && "$save_calls" == 4 ]]
+[[ "$insert_calls" == 6 && "$save_calls" == 5 ]]
 [[ "${rules[INPUT -p tcp --dport 9001 -j ACCEPT]:-}" == 1 ]]
 
 if grep -Eq 'Cập nhật x-ui|Cập nhật bảng điều khiển|x-ui update|check_install && update' "$repo_root/x-ui.sh"; then
     echo 'Menu vẫn còn tùy chọn cập nhật' >&2
     exit 1
 fi
-grep -Fq '2.${plain} Mở cổng firewall (TCP/UDP)' "$repo_root/x-ui.sh"
+grep -Fq '2.${plain} Mở mặc định TCP 54321, 80, 443' "$repo_root/x-ui.sh"
 grep -Fq '"open-port")' "$repo_root/x-ui.sh"
-echo 'PASS: mở cổng TCP/UDP, không trùng, lưu luật, xử lý lỗi và bỏ menu cập nhật.'
+grep -Fq 'open_default_firewall_ports' "$repo_root/x-ui.sh"
+echo 'PASS: mở mặc định 3 cổng, hỗ trợ TCP/UDP, không trùng, lưu luật và xử lý lỗi.'

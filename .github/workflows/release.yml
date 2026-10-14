@@ -31,6 +31,7 @@ jobs:
         run: |
           bash scripts/packaging/test-install-port.sh
           bash scripts/packaging/test-open-port.sh
+          bash scripts/packaging/test-auto-firewall-install.sh
           bash scripts/packaging/test-assembly.sh
       - name: Kiem thu Go va cau hinh nghe cong khai
         shell: bash
