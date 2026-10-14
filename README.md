@@ -1,4 +1,4 @@
-# x-ui VI — Cài một lần trên VPS, quản lý qua web
+# x-ui VI — Cài một lần trên Oracle Cloud VPS, quản lý qua web
 
 **Bản dùng cố định: [`v0.3.2-vi.2`](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.2).**
 
@@ -20,9 +20,11 @@ máy tính hoặc điện thoại khác bằng `http://IP_VPS:PORT/`. Ứng dụ
 
 ## 1. Chuẩn bị VPS
 
-- **Ubuntu 22.04 LTS 64-bit** (khuyên dùng), có SSH, `systemd`, `sudo` và Internet.
+- **Oracle Cloud Infrastructure (OCI)**: Compute Instance có **Public IPv4**,
+  nằm trong public subnet có route Internet Gateway. Chọn image **Ubuntu 22.04
+  LTS 64-bit** (đã kiểm thử), có SSH, `systemd`, `sudo` và Internet.
 - CPU **AMD64/x86_64** hoặc **ARM64/aarch64** (script tự chọn gói).
-- Một cổng TCP chưa được sử dụng, ví dụ `54321`.
+- Các cổng TCP `80`, `443` cho VLESS và `54321` cho quản trị (nếu chưa bị chiếm).
 
 Từ máy tính, đăng nhập VPS bằng SSH (thay `IP_VPS` và tài khoản nếu cần):
 
@@ -56,16 +58,71 @@ Khi được hỏi cấu hình, hãy nhập **`y`** rồi đặt:
 **Lưu ý:** `0.0.0.0` là **địa chỉ lắng nghe ở phía VPS**, không phải địa chỉ
 để nhập vào trình duyệt. Để truy cập, luôn dùng **IP công khai của VPS**.
 
-## 3. Mở cổng một lần cho cả web và các kết nối VLESS
+## 3. Mở ba cổng TCP trên Oracle Cloud (OCI)
 
-Ví dụ dùng cổng quản trị `54321` và dành trước dải **`20000–20100/tcp`** cho
-VLESS. Khi thêm inbound VLESS qua web, chọn một cổng **trong dải này** (ví dụ
-`20001`, `20002`...). Bạn không cần SSH để mở từng cổng sau đó.
+Chỉ cần mở **TCP `80`, `443` và `54321` một lần**. Sau này tạo VLESS qua web
+với cổng `80` hoặc `443`, không cần SSH trở lại để mở cổng. Cổng `54321` dành
+riêng cho panel (thay bằng cổng quản trị đã chọn nếu khác).
 
-Không chạy `iptables -F`: lệnh đó xóa các quy tắc firewall hiện có, có thể mở
-nhầm dịch vụ khác ra Internet và không ảnh hưởng tới Security Group của VPS.
+### 3.1. Oracle Cloud Console — Security List hoặc NSG
 
-Đầu tiên kiểm tra ứng dụng đã chạy và panel lắng nghe trên mọi IPv4:
+1. Vào [Oracle Cloud Console](https://cloud.oracle.com/) → **Networking** →
+   **Virtual Cloud Networks** → chọn **VCN** của VPS.
+2. Chọn **Security Lists** → Security List gắn với **subnet** của VPS (thường
+   là `Default Security List for ...`). Nếu VNIC dùng **Network Security
+   Group (NSG)**, kiểm tra các **Security Rules** của NSG liên quan.
+3. Chọn **Add Ingress Rules**, tạo các quy tắc bên dưới với **IP Protocol =
+   TCP**, **Source Port = All**, **Stateless = bỏ chọn** (stateful):
+
+| Destination Port | Source CIDR | Sử dụng |
+| --- | --- | --- |
+| `80` | `0.0.0.0/0` | VLESS TCP cổng 80 |
+| `443` | `0.0.0.0/0` | VLESS TCP cổng 443 |
+| `54321` | `IP_CUA_BAN/32` (nên dùng) | Web quản trị x-ui |
+
+Nếu cần điều khiển panel từ nhiều mạng với IP thường xuyên thay đổi, có thể
+đặt Source CIDR của `54321` là `0.0.0.0/0`, **nhưng khi đó màn hình đăng nhập
+HTTP bị phơi ra Internet và không mã hóa mật khẩu**. Nên ưu tiên IP giới hạn
+hoặc cấu hình HTTPS. **Giữ nguyên** quy tắc SSH `22/tcp` hiện có.
+
+Các cổng chỉ có thể truy cập từ Internet nếu instance có Public IPv4 và subnet
+có route qua Internet Gateway. Xem hướng dẫn [Oracle về Security Lists](https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/securitylists.htm)
+và [ví dụ mở TCP 80/443](https://docs.oracle.com/en/learn/publish-webserver-using-oci/index.html).
+
+### 3.2. Firewall bên trong Ubuntu trên Oracle Cloud
+
+**Không chạy `iptables -F`**, không bật hoặc chỉnh UFW trên Oracle Ubuntu image
+nếu chưa hiểu cấu hình của image. Oracle cảnh báo thay đổi firewall có thể ảnh
+hưởng các quy tắc thiết yếu cho boot volume và làm VPS không khởi động được.
+Xem [Oracle Compute Best Practices](https://docs.oracle.com/en-us/iaas/Content/Compute/References/bestpracticescompute.htm).
+
+Kiểm tra các luật hiện tại, rồi chỉ **thêm** ba quy tắc TCP cần dùng vào
+`INPUT`. Các lệnh dưới đây không xóa luật có sẵn và tránh tạo trùng:
+
+```bash
+sudo iptables -S INPUT
+
+for port in 80 443 54321; do
+  sudo iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || \
+    sudo iptables -I INPUT 1 -p tcp --dport "$port" -j ACCEPT
+done
+
+sudo iptables -L INPUT -n --line-numbers
+```
+
+Để giữ các luật này sau khi **khởi động lại VPS**, trên Ubuntu dùng gói
+`iptables-persistent` / lệnh `netfilter-persistent` (nếu chưa có):
+
+```bash
+sudo apt install -y iptables-persistent
+sudo netfilter-persistent save
+```
+
+Nếu máy dùng firewall riêng do `nftables` hay phần mềm khác quản lý, hãy cấu
+hình theo công cụ đó thay vì chèn luật vào hai hệ thống cùng lúc. Không thay
+đổi luật SSH hoặc các luật `OUTPUT` phục vụ Oracle Cloud.
+
+Kiểm tra panel lắng nghe trên mọi IPv4:
 
 ```bash
 sudo systemctl is-active x-ui
@@ -73,59 +130,7 @@ sudo systemctl is-enabled x-ui
 sudo ss -lntp | grep ':54321'
 ```
 
-Dịch vụ cần ở trạng thái `active`, `enabled`. Dòng `ss` cần thể hiện địa chỉ
-`0.0.0.0:54321` (hoặc `*:54321`), tức panel đã nhận kết nối từ bên ngoài VPS.
-
-**Firewall trong VPS:** kiểm tra trạng thái UFW:
-
-```bash
-sudo ufw status
-```
-
-Nếu UFW đang bật (`Status: active`), cho phép cổng quản trị và toàn bộ dải
-VLESS một lần:
-
-```bash
-sudo ufw allow 54321/tcp
-sudo ufw allow 20000:20100/tcp
-```
-
-Nếu VLESS dùng truyền tải UDP, mở thêm `20000:20100/udp` bằng UFW. Chỉ mở giao
-thức thực sự sử dụng, không cần mở tất cả cổng TCP/UDP của máy chủ.
-
-Nếu UFW chưa cài hoặc đang tắt, **không bật UFW hoặc chạy `iptables -F` một cách
-tùy tiện**. Trước tiên xem các luật hiện có:
-
-```bash
-sudo iptables -S INPUT
-```
-
-Trường hợp VPS dùng **iptables** và đang có các luật chặn cổng trong chuỗi
-`INPUT`, có thể thêm hai luật cho phép này **mà không xóa luật cũ**:
-
-```bash
-sudo iptables -I INPUT 1 -p tcp --dport 54321 -j ACCEPT
-sudo iptables -I INPUT 1 -p tcp --dport 20000:20100 -j ACCEPT
-```
-
-Nếu dùng UDP, thêm quy tắc UDP tương tự. Các luật `iptables` có thể mất sau
-khởi động lại; nếu VPS đã sử dụng `netfilter-persistent`, chạy
-`sudo netfilter-persistent save` để lưu cấu hình. Với hệ thống dùng `nftables`
-hoặc công cụ firewall khác, hãy chỉnh trong đúng công cụ đang quản lý firewall,
-không trộn nhiều công cụ khi chưa kiểm tra.
-
-**Firewall trên nhà cung cấp VPS:** vào mục **Security Group / Cloud Firewall /
-Ingress Rules**, tạo hai quy tắc nhận kết nối từ Internet:
-
-| Giao thức | Cổng | Mục đích |
-| --- | --- | --- |
-| TCP | `54321` | Đăng nhập bảng điều khiển; nên giới hạn IP nguồn |
-| TCP | `20000–20100` | Các inbound VLESS sẽ tạo sau này |
-
-Nếu VLESS dùng UDP, tạo thêm quy tắc UDP cho dải cổng tương ứng. Giữ nguyên
-quy tắc SSH TCP `22` (hoặc cổng SSH riêng đang dùng) để tránh tự khóa quyền
-quản trị VPS. Không phải mở dải cổng trên nếu chỉ sử dụng các cổng cụ thể khác;
-thay dải cho phù hợp ngay ở bước cài.
+Kết quả mong đợi: `active`, `enabled` và `0.0.0.0:54321` (hoặc `*:54321`).
 
 ## 4. Điều khiển trên máy khác
 
@@ -138,12 +143,14 @@ http://IP_VPS:54321/
 Đăng nhập bằng tài khoản ở bước 2. **Không cần SSH tunnel và không cần giữ
 phiên SSH cài đặt đang mở.** Dịch vụ x-ui tự chạy cùng VPS qua `systemd`.
 
-Nếu trang không mở được, kiểm tra cổng đã lắng nghe ở `0.0.0.0`, các luật
-firewall của VPS và **Ingress Rule** ở nhà cung cấp. Nếu web truy cập được
-nhưng VLESS không hoạt động, kiểm tra **cổng inbound đã chọn nằm trong dải cho
-phép**, ứng dụng Xray đã lắng nghe cổng đó và giao thức mạng (TCP/UDP) khớp
-với quy tắc firewall. Ví dụ VLESS dùng cổng `443/tcp` thì phải mở thêm đúng
-cổng `443/tcp` ở cả hai lớp firewall vì nằm ngoài dải ví dụ.
+Nếu trang không mở được, kiểm tra IP công khai, quy tắc OCI Security List/NSG,
+firewall Ubuntu và lệnh `ss` ở trên. Nếu web vào được nhưng VLESS không hoạt
+động, xem trong giao diện x-ui liệu inbound sử dụng đúng `80/tcp` hoặc
+`443/tcp`, đã bật, và Xray có lắng nghe hay chưa (`sudo ss -lntp`).
+
+**Lưu ý:** Cổng `443` không tự biến kết nối VLESS thành HTTPS/TLS; cần cấu hình
+bảo mật và giao thức truyền tải tương ứng trong inbound. Một địa chỉ IP không
+thể có hai tiến trình độc lập cùng lắng nghe một cổng TCP tại một thời điểm.
 
 ## 5. Kiểm tra nhanh
 
