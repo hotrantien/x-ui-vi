@@ -56,9 +56,16 @@ Khi được hỏi cấu hình, hãy nhập **`y`** rồi đặt:
 **Lưu ý:** `0.0.0.0` là **địa chỉ lắng nghe ở phía VPS**, không phải địa chỉ
 để nhập vào trình duyệt. Để truy cập, luôn dùng **IP công khai của VPS**.
 
-## 3. Mở cổng quản trị
+## 3. Mở cổng một lần cho cả web và các kết nối VLESS
 
-Ví dụ bạn đã chọn cổng `54321`:
+Ví dụ dùng cổng quản trị `54321` và dành trước dải **`20000–20100/tcp`** cho
+VLESS. Khi thêm inbound VLESS qua web, chọn một cổng **trong dải này** (ví dụ
+`20001`, `20002`...). Bạn không cần SSH để mở từng cổng sau đó.
+
+Không chạy `iptables -F`: lệnh đó xóa các quy tắc firewall hiện có, có thể mở
+nhầm dịch vụ khác ra Internet và không ảnh hưởng tới Security Group của VPS.
+
+Đầu tiên kiểm tra ứng dụng đã chạy và panel lắng nghe trên mọi IPv4:
 
 ```bash
 sudo systemctl is-active x-ui
@@ -75,21 +82,50 @@ Dịch vụ cần ở trạng thái `active`, `enabled`. Dòng `ss` cần thể 
 sudo ufw status
 ```
 
-Nếu UFW đang bật (`Status: active`), cho phép cổng TCP tương ứng:
+Nếu UFW đang bật (`Status: active`), cho phép cổng quản trị và toàn bộ dải
+VLESS một lần:
 
 ```bash
 sudo ufw allow 54321/tcp
+sudo ufw allow 20000:20100/tcp
 ```
 
-Nếu UFW chưa cài hoặc đang tắt, không cần bật UFW chỉ để mở cổng; hãy kiểm tra
-firewall thực tế của hệ điều hành (`iptables`/`nftables`) nếu vẫn không truy cập
-được. **Không vô hiệu hóa firewall hoặc xóa các luật hiện có một cách tùy tiện.**
+Nếu VLESS dùng truyền tải UDP, mở thêm `20000:20100/udp` bằng UFW. Chỉ mở giao
+thức thực sự sử dụng, không cần mở tất cả cổng TCP/UDP của máy chủ.
+
+Nếu UFW chưa cài hoặc đang tắt, **không bật UFW hoặc chạy `iptables -F` một cách
+tùy tiện**. Trước tiên xem các luật hiện có:
+
+```bash
+sudo iptables -S INPUT
+```
+
+Trường hợp VPS dùng **iptables** và đang có các luật chặn cổng trong chuỗi
+`INPUT`, có thể thêm hai luật cho phép này **mà không xóa luật cũ**:
+
+```bash
+sudo iptables -I INPUT 1 -p tcp --dport 54321 -j ACCEPT
+sudo iptables -I INPUT 1 -p tcp --dport 20000:20100 -j ACCEPT
+```
+
+Nếu dùng UDP, thêm quy tắc UDP tương tự. Các luật `iptables` có thể mất sau
+khởi động lại; nếu VPS đã sử dụng `netfilter-persistent`, chạy
+`sudo netfilter-persistent save` để lưu cấu hình. Với hệ thống dùng `nftables`
+hoặc công cụ firewall khác, hãy chỉnh trong đúng công cụ đang quản lý firewall,
+không trộn nhiều công cụ khi chưa kiểm tra.
 
 **Firewall trên nhà cung cấp VPS:** vào mục **Security Group / Cloud Firewall /
-Ingress Rules** và cho phép **TCP cổng `54321`**. Nên giới hạn nguồn bằng **IP
-công khai của máy bạn** nếu nhà cung cấp hỗ trợ; chỉ dùng `0.0.0.0/0` khi bạn
-chấp nhận panel có thể được truy cập từ mọi nơi. Nếu dùng cổng khác, thay
-`54321` ở tất cả các bước bằng cổng đã chọn.
+Ingress Rules**, tạo hai quy tắc nhận kết nối từ Internet:
+
+| Giao thức | Cổng | Mục đích |
+| --- | --- | --- |
+| TCP | `54321` | Đăng nhập bảng điều khiển; nên giới hạn IP nguồn |
+| TCP | `20000–20100` | Các inbound VLESS sẽ tạo sau này |
+
+Nếu VLESS dùng UDP, tạo thêm quy tắc UDP cho dải cổng tương ứng. Giữ nguyên
+quy tắc SSH TCP `22` (hoặc cổng SSH riêng đang dùng) để tránh tự khóa quyền
+quản trị VPS. Không phải mở dải cổng trên nếu chỉ sử dụng các cổng cụ thể khác;
+thay dải cho phù hợp ngay ở bước cài.
 
 ## 4. Điều khiển trên máy khác
 
@@ -104,8 +140,10 @@ phiên SSH cài đặt đang mở.** Dịch vụ x-ui tự chạy cùng VPS qua 
 
 Nếu trang không mở được, kiểm tra cổng đã lắng nghe ở `0.0.0.0`, các luật
 firewall của VPS và **Ingress Rule** ở nhà cung cấp. Nếu web truy cập được
-nhưng kết nối Xray không hoạt động, cổng của từng inbound Xray cũng phải được
-cho phép trong firewall (riêng với cổng quản trị).
+nhưng VLESS không hoạt động, kiểm tra **cổng inbound đã chọn nằm trong dải cho
+phép**, ứng dụng Xray đã lắng nghe cổng đó và giao thức mạng (TCP/UDP) khớp
+với quy tắc firewall. Ví dụ VLESS dùng cổng `443/tcp` thì phải mở thêm đúng
+cổng `443/tcp` ở cả hai lớp firewall vì nằm ngoài dải ví dụ.
 
 ## 5. Kiểm tra nhanh
 
