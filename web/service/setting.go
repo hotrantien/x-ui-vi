@@ -22,7 +22,7 @@ var xrayTemplateConfig string
 
 var defaultValueMap = map[string]string{
 	"xrayTemplateConfig": xrayTemplateConfig,
-	"webListen":          "127.0.0.1",
+	"webListen":          "0.0.0.0",
 	"webPort":            "54321",
 	"webCertFile":        "",
 	"webKeyFile":         "",

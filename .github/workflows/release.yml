@@ -29,6 +29,9 @@ jobs:
       - name: Kiem tra dong goi
         shell: bash
         run: bash scripts/packaging/test-assembly.sh
+      - name: Kiem thu Go va cau hinh nghe cong khai
+        shell: bash
+        run: CGO_ENABLED=1 go test ./database ./web/service ./xray -count=1
       - name: Build native va smoke test SQLite CGO
         shell: bash
         run: |
