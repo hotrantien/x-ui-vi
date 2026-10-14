@@ -77,6 +77,15 @@ log_error() {
     echo -e "${red}Lỗi: $*${plain}" >&2
 }
 
+resolve_panel_port() {
+    local selected="${1:-54321}"
+    if [[ ! "$selected" =~ ^[1-9][0-9]{0,4}$ ]] || (( selected > 65535 )); then
+        log_error "Cổng không hợp lệ: $selected (chỉ chấp nhận số từ 1 đến 65535)."
+        return 1
+    fi
+    printf '%s\n' "$selected"
+}
+
 # Chỉ yêu cầu cấu hình tài khoản khi cài đặt mới.
 config_after_install() {
     echo -e "${yellow}Để đảm bảo an toàn, hãy đổi cổng truy cập và mật khẩu sau khi cài đặt.${plain}"
@@ -86,7 +95,8 @@ config_after_install() {
         echo -e "${yellow}Tên tài khoản sẽ được đặt thành: ${config_account}${plain}"
         read -r -s -p "Nhập mật khẩu tài khoản: " config_password
         echo
-        read -p "Nhập cổng truy cập bảng điều khiển: " config_port
+        read -r -p "Nhập cổng truy cập bảng điều khiển [54321]: " config_port || return 1
+        config_port="$(resolve_panel_port "$config_port")" || return 1
         echo -e "${yellow}Cổng truy cập bảng điều khiển sẽ là: ${config_port}${plain}"
         echo -e "${yellow}Đã xác nhận, đang lưu cài đặt...${plain}"
         /usr/local/x-ui/x-ui setting -username "${config_account}" -password "${config_password}" || return 1

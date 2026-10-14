@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Cai mot lan tren VPS moi; chi tai ban x-ui VI co dinh v0.3.2-vi.2.
+# Cai mot lan tren VPS moi; chi tai ban x-ui VI co dinh v0.3.2-vi.3.
 repo='hotrantien/x-ui-vi'
-tag='v0.3.2-vi.2'
+tag='v0.3.2-vi.3'
 source_url="https://raw.githubusercontent.com/${repo}/${tag}/scripts/packaging/install-from-github.sh"
 
 if (( EUID != 0 )); then

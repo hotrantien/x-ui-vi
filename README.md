@@ -1,6 +1,6 @@
 # x-ui VI — Cài một lần trên Oracle Cloud VPS, quản lý qua web
 
-**Bản dùng cố định: [`v0.3.2-vi.2`](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.2).**
+**Bản dùng cố định: [`v0.3.2-vi.3`](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.3).**
 
 Đây là bản Việt hóa x-ui tự đóng gói, có mã nguồn, giao diện, Xray Linux và
 `geoip.dat` / `geosite.dat` trong chính repository `hotrantien/x-ui-vi`.
@@ -41,7 +41,7 @@ set -o pipefail && curl -fsSL https://raw.githubusercontent.com/hotrantien/x-ui-
 ```
 
 Lệnh tải script khởi động từ repo của bạn và chạy trực tiếp bằng Bash. Script
-**cố định tag `v0.3.2-vi.2`**, tải gói từ [GitHub Releases của repository này](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.2),
+**cố định tag `v0.3.2-vi.3`**, tải gói từ [GitHub Releases của repository này](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.3),
 kiểm tra SHA-256 rồi cài panel và Xray. Không cần tải từ repo x-ui gốc hoặc
 tạo file cài trong thư mục hiện tại. Bạn cần **giữ phiên SSH mở trong lúc cài**
 để nhập tài khoản, mật khẩu và cổng. Sau khi hoàn tất có thể đóng SSH.
@@ -54,7 +54,8 @@ Khi được hỏi cấu hình, hãy nhập **`y`** rồi đặt:
 
 1. Tên tài khoản quản trị.
 2. Mật khẩu mạnh, riêng biệt.
-3. Cổng web quản trị, ví dụ **`54321`**.
+3. Cổng web quản trị: **nhấn Enter để giữ mặc định `54321`**, hoặc nhập một
+   cổng khác từ `1` đến `65535`.
 
 **Lưu ý:** `0.0.0.0` là **địa chỉ lắng nghe ở phía VPS**, không phải địa chỉ
 để nhập vào trình duyệt. Để truy cập, luôn dùng **IP công khai của VPS**.
@@ -65,32 +66,12 @@ Chỉ cần mở **TCP `80`, `443` và `54321` một lần**. Sau này tạo VLE
 với cổng `80` hoặc `443`, không cần SSH trở lại để mở cổng. Cổng `54321` dành
 riêng cho panel (thay bằng cổng quản trị đã chọn nếu khác).
 
-### 3.1. Oracle Cloud Console — Security List hoặc NSG
+**Trên Oracle Cloud:** bạn tự mở Ingress TCP `80`, `443` và cổng quản trị
+`54321` (nếu đổi cổng, mở cổng tương ứng) trong Security List/NSG. Giữ nguyên
+cổng SSH. Nên giới hạn IP nguồn truy cập **cổng quản trị** thay vì mở cho mọi
+địa chỉ; phần này không cần cấu hình qua script cài đặt.
 
-1. Vào [Oracle Cloud Console](https://cloud.oracle.com/) → **Networking** →
-   **Virtual Cloud Networks** → chọn **VCN** của VPS.
-2. Chọn **Security Lists** → Security List gắn với **subnet** của VPS (thường
-   là `Default Security List for ...`). Nếu VNIC dùng **Network Security
-   Group (NSG)**, kiểm tra các **Security Rules** của NSG liên quan.
-3. Chọn **Add Ingress Rules**, tạo các quy tắc bên dưới với **IP Protocol =
-   TCP**, **Source Port = All**, **Stateless = bỏ chọn** (stateful):
-
-| Destination Port | Source CIDR | Sử dụng |
-| --- | --- | --- |
-| `80` | `0.0.0.0/0` | VLESS TCP cổng 80 |
-| `443` | `0.0.0.0/0` | VLESS TCP cổng 443 |
-| `54321` | `IP_CUA_BAN/32` (nên dùng) | Web quản trị x-ui |
-
-Nếu cần điều khiển panel từ nhiều mạng với IP thường xuyên thay đổi, có thể
-đặt Source CIDR của `54321` là `0.0.0.0/0`, **nhưng khi đó màn hình đăng nhập
-HTTP bị phơi ra Internet và không mã hóa mật khẩu**. Nên ưu tiên IP giới hạn
-hoặc cấu hình HTTPS. **Giữ nguyên** quy tắc SSH `22/tcp` hiện có.
-
-Các cổng chỉ có thể truy cập từ Internet nếu instance có Public IPv4 và subnet
-có route qua Internet Gateway. Xem hướng dẫn [Oracle về Security Lists](https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/securitylists.htm)
-và [ví dụ mở TCP 80/443](https://docs.oracle.com/en/learn/publish-webserver-using-oci/index.html).
-
-### 3.2. Firewall bên trong Ubuntu trên Oracle Cloud
+### Firewall bên trong Ubuntu trên Oracle Cloud
 
 **Không chạy `iptables -F`**, không bật hoặc chỉnh UFW trên Oracle Ubuntu image
 nếu chưa hiểu cấu hình của image. Oracle cảnh báo thay đổi firewall có thể ảnh
@@ -160,7 +141,7 @@ sudo /usr/local/x-ui/x-ui -v
 sudo systemctl status x-ui --no-pager
 ```
 
-Phiên bản mong đợi: `0.3.2-vi.2`. Khi cần xem lỗi:
+Phiên bản mong đợi: `0.3.2-vi.3`. Khi cần xem lỗi:
 
 ```bash
 sudo journalctl -u x-ui -n 50 --no-pager

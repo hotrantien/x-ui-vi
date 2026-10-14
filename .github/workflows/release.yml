@@ -28,7 +28,9 @@ jobs:
           cache: true
       - name: Kiem tra dong goi
         shell: bash
-        run: bash scripts/packaging/test-assembly.sh
+        run: |
+          bash scripts/packaging/test-install-port.sh
+          bash scripts/packaging/test-assembly.sh
       - name: Kiem thu Go va cau hinh nghe cong khai
         shell: bash
         run: CGO_ENABLED=1 go test ./database ./web/service ./xray -count=1
