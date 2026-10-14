@@ -34,20 +34,21 @@ ssh ubuntu@IP_VPS
 
 ## 2. Cài bản cố định
 
-Chạy các lệnh sau **trên VPS**:
+Trên VPS Ubuntu 22.04, chạy **một lệnh duy nhất**:
 
 ```bash
-sudo apt update
-sudo apt install -y curl ca-certificates tar coreutils gawk
-
-curl -fL --retry 3 -o install-x-ui-vi.sh \
-  https://raw.githubusercontent.com/hotrantien/x-ui-vi/v0.3.2-vi.2/scripts/packaging/install-from-github.sh
-
-sudo bash install-x-ui-vi.sh hotrantien/x-ui-vi v0.3.2-vi.2
+set -o pipefail && curl -fsSL https://raw.githubusercontent.com/hotrantien/x-ui-vi/main/quick-install.sh | sudo bash
 ```
 
-Bộ cài tải đúng phiên bản từ [GitHub Releases của repository này](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.2),
-kiểm tra SHA-256 rồi cài vào VPS. Không cần tải từ repo x-ui gốc.
+Lệnh tải script khởi động từ repo của bạn và chạy trực tiếp bằng Bash. Script
+**cố định tag `v0.3.2-vi.2`**, tải gói từ [GitHub Releases của repository này](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.2),
+kiểm tra SHA-256 rồi cài panel và Xray. Không cần tải từ repo x-ui gốc hoặc
+tạo file cài trong thư mục hiện tại. Bạn cần **giữ phiên SSH mở trong lúc cài**
+để nhập tài khoản, mật khẩu và cổng. Sau khi hoàn tất có thể đóng SSH.
+
+Nếu máy thiếu `curl`, cài một lần bằng `sudo apt update && sudo apt install -y curl`.
+Chỉ chạy lệnh từ repo bạn tin cậy: `curl | sudo bash` thực thi script tải qua
+mạng với quyền quản trị.
 
 Khi được hỏi cấu hình, hãy nhập **`y`** rồi đặt:
 
