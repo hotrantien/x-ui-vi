@@ -304,7 +304,7 @@ install_x-ui() {
     echo -e "x-ui disable      - Tắt tự khởi động x-ui cùng hệ thống"
     echo -e "x-ui log          - Xem nhật ký x-ui"
     echo -e "x-ui v2-ui        - Chuyển dữ liệu tài khoản v2-ui sang x-ui trên máy này"
-    echo -e "x-ui update       - Cập nhật bảng điều khiển x-ui"
+    echo -e "x-ui open-port    - Mở cổng firewall Ubuntu (TCP/UDP)"
     echo -e "x-ui install      - Cài đặt bảng điều khiển x-ui"
     echo -e "x-ui uninstall    - Gỡ cài đặt bảng điều khiển x-ui"
     echo -e "----------------------------------------------"

@@ -1,6 +1,6 @@
 # x-ui VI — Cài một lần trên Oracle Cloud VPS, quản lý qua web
 
-**Bản dùng cố định: [`v0.3.2-vi.3`](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.3).**
+**Bản dùng cố định: [`v0.3.2-vi.4`](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.4).**
 
 Đây là bản Việt hóa x-ui tự đóng gói, có mã nguồn, giao diện, Xray Linux và
 `geoip.dat` / `geosite.dat` trong chính repository `hotrantien/x-ui-vi`.
@@ -41,7 +41,7 @@ set -o pipefail && curl -fsSL https://raw.githubusercontent.com/hotrantien/x-ui-
 ```
 
 Lệnh tải script khởi động từ repo của bạn và chạy trực tiếp bằng Bash. Script
-**cố định tag `v0.3.2-vi.3`**, tải gói từ [GitHub Releases của repository này](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.3),
+**cố định tag `v0.3.2-vi.4`**, tải gói từ [GitHub Releases của repository này](https://github.com/hotrantien/x-ui-vi/releases/tag/v0.3.2-vi.4),
 kiểm tra SHA-256 rồi cài panel và Xray. Không cần tải từ repo x-ui gốc hoặc
 tạo file cài trong thư mục hiện tại. Bạn cần **giữ phiên SSH mở trong lúc cài**
 để nhập tài khoản, mật khẩu và cổng. Sau khi hoàn tất có thể đóng SSH.
@@ -78,22 +78,22 @@ nếu chưa hiểu cấu hình của image. Oracle cảnh báo thay đổi firew
 hưởng các quy tắc thiết yếu cho boot volume và làm VPS không khởi động được.
 Xem [Oracle Compute Best Practices](https://docs.oracle.com/en-us/iaas/Content/Compute/References/bestpracticescompute.htm).
 
-Kiểm tra các luật hiện tại, rồi chỉ **thêm** ba quy tắc TCP cần dùng vào
-`INPUT`. Các lệnh dưới đây không xóa luật có sẵn và tránh tạo trùng:
+Sau khi cài, chạy **`sudo x-ui`** và chọn **`2. Mở cổng firewall (TCP/UDP)`**.
+Nhập cổng `80`, chọn `tcp`; sau đó lặp lại với `443` và `54321` (nếu
+cổng này đã mở thì menu sẽ bỏ qua, không tạo luật trùng).
+
+Hoặc mở cả ba cổng **một lần** từ SSH bằng các lệnh tương đương:
 
 ```bash
-sudo iptables -S INPUT
-
-for port in 80 443 54321; do
-  sudo iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || \
-    sudo iptables -I INPUT 1 -p tcp --dport "$port" -j ACCEPT
-done
-
-sudo iptables -L INPUT -n --line-numbers
+sudo x-ui open-port 80 tcp
+sudo x-ui open-port 443 tcp
+sudo x-ui open-port 54321 tcp
 ```
 
-Để giữ các luật này sau khi **khởi động lại VPS**, trên Ubuntu dùng gói
-`iptables-persistent` / lệnh `netfilter-persistent` (nếu chưa có):
+Menu chỉ thêm các luật `iptables` cần thiết vào `INPUT`, **không xóa các luật
+Oracle có sẵn**, và tự chạy `netfilter-persistent save` khi công cụ này đã
+có trên VPS. Để các luật còn hiệu lực sau **khởi động lại**, nếu menu báo chưa
+có `netfilter-persistent` thì cài công cụ lưu firewall một lần:
 
 ```bash
 sudo apt install -y iptables-persistent
@@ -141,7 +141,7 @@ sudo /usr/local/x-ui/x-ui -v
 sudo systemctl status x-ui --no-pager
 ```
 
-Phiên bản mong đợi: `0.3.2-vi.3`. Khi cần xem lỗi:
+Phiên bản mong đợi: `0.3.2-vi.4`. Khi cần xem lỗi:
 
 ```bash
 sudo journalctl -u x-ui -n 50 --no-pager

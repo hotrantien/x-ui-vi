@@ -121,23 +121,69 @@ install() {
     fi
 }
 
-update() {
-    local archive="${2:-}"
-    confirm "Cập nhật bằng gói .tar.gz cục bộ. Dữ liệu /etc/x-ui được giữ nguyên. Tiếp tục?" "n"
-    if [[ $? != 0 ]]; then
-        LOGE "Đã hủy"
-        if [[ $# == 0 ]]; then
-            before_show_menu
-        fi
-        return 0
+valid_firewall_port() {
+    local port="${1:-}"
+    [[ "$port" =~ ^[1-9][0-9]{0,4}$ ]] && (( port <= 65535 ))
+}
+
+open_firewall_port() {
+    local port="${1:-}"
+    local protocol="${2:-}"
+    local rule_protocol
+    local protocols=()
+    local changed=0
+
+    if [[ -z "$port" ]]; then
+        read -r -p "Nhập cổng cần mở [1-65535]: " port || return 1
     fi
-    if run_local_installer "$archive"; then
-        LOGI "Đã cập nhật từ gói cục bộ"
-        exit 0
-    else
-        LOGE "Cập nhật thất bại. Hãy kiểm tra gói cục bộ và thử lại."
+    if ! valid_firewall_port "$port"; then
+        LOGE "Cổng không hợp lệ: $port. Chỉ chấp nhận số từ 1 đến 65535."
         return 1
     fi
+
+    if [[ -z "$protocol" ]]; then
+        read -r -p "Giao thức [tcp/udp/both, mặc định tcp]: " protocol || return 1
+    fi
+    protocol="${protocol,,}"
+    protocol="${protocol:-tcp}"
+    case "$protocol" in
+    tcp|udp) protocols=("$protocol") ;;
+    both) protocols=(tcp udp) ;;
+    *) LOGE "Giao thức không hợp lệ; chỉ chọn tcp, udp hoặc both."; return 1 ;;
+    esac
+
+    if ! command -v iptables >/dev/null 2>&1; then
+        LOGE "Không tìm thấy iptables. Không thể mở cổng."
+        return 1
+    fi
+
+    for rule_protocol in "${protocols[@]}"; do
+        if iptables -C INPUT -p "$rule_protocol" --dport "$port" -j ACCEPT 2>/dev/null; then
+            LOGI "Đã có luật cho phép ${rule_protocol^^} $port."
+        else
+            if ! iptables -I INPUT 1 -p "$rule_protocol" --dport "$port" -j ACCEPT; then
+                LOGE "Không thể thêm luật ${rule_protocol^^} $port."
+                return 1
+            fi
+            changed=1
+            LOGI "Đã mở cổng ${rule_protocol^^} $port trên firewall Ubuntu."
+        fi
+    done
+
+    if (( changed )); then
+        if command -v netfilter-persistent >/dev/null 2>&1; then
+            if netfilter-persistent save; then
+                LOGI "Đã lưu luật firewall để dùng sau khi VPS khởi động lại."
+            else
+                LOGE "Đã thêm luật hiện tại nhưng không lưu được. Kiểm tra netfilter-persistent."
+                return 1
+            fi
+        else
+            LOGE "Luật đã mở nhưng chưa được lưu lâu dài (thiếu netfilter-persistent)."
+            LOGI "Trên Ubuntu có thể cài iptables-persistent rồi chạy: sudo netfilter-persistent save"
+        fi
+    fi
+    LOGI "Lưu ý: Oracle Cloud Security List/NSG phải được cho phép riêng trên web OCI."
 }
 
 uninstall() {
@@ -485,7 +531,7 @@ show_usage() {
     echo "x-ui disable      - Tắt tự khởi động x-ui cùng hệ thống"
     echo "x-ui log          - Xem nhật ký x-ui"
     echo "x-ui v2-ui        - Chuyển dữ liệu tài khoản v2-ui sang x-ui trên máy này"
-    echo "x-ui update [gói] - Cập nhật bảng điều khiển từ gói .tar.gz cục bộ"
+    echo "x-ui open-port [cổng] [tcp|udp|both] - Mở cổng firewall Ubuntu"
     echo "x-ui install [gói] - Cài đặt bảng điều khiển từ gói .tar.gz cục bộ"
     echo "x-ui uninstall    - Gỡ cài đặt bảng điều khiển x-ui"
     echo "------------------------------------------"
@@ -497,7 +543,7 @@ show_menu() {
   ${green}0.${plain} Thoát
 ————————————————
   ${green}1.${plain} Cài đặt x-ui
-  ${green}2.${plain} Cập nhật x-ui
+  ${green}2.${plain} Mở cổng firewall (TCP/UDP)
   ${green}3.${plain} Gỡ cài đặt x-ui
 ————————————————
   ${green}4.${plain} Đặt lại tên tài khoản và mật khẩu
@@ -528,7 +574,10 @@ show_menu() {
         check_uninstall && install
         ;;
     2)
-        check_install && update
+        if check_install; then
+            open_firewall_port
+            before_show_menu
+        fi
         ;;
     3)
         check_install && uninstall
@@ -604,8 +653,8 @@ if [[ $# > 0 ]]; then
     "v2-ui")
         check_install 0 && migrate_v2_ui 0
         ;;
-    "update")
-        check_install 0 && update 0 "${2:-}"
+    "open-port")
+        check_install 0 && open_firewall_port "${2:-}" "${3:-}"
         ;;
     "install")
         check_uninstall 0 && install 0 "${2:-}"
