@@ -166,6 +166,12 @@ Phiên bản mong đợi: `0.3.2-vi.2`. Khi cần xem lỗi:
 sudo journalctl -u x-ui -n 50 --no-pager
 ```
 
+Nếu cần mở menu quản trị từ SSH, dùng **`sudo x-ui`**. Script quản trị
+yêu cầu quyền root; chạy `x-ui` bằng tài khoản `ubuntu` thông thường có thể
+báo `Permission denied`. Đây không phải lỗi dịch vụ và không cần sửa quyền
+tệp hoặc cài lại. Sau lần cài đầu tiên, bạn có thể đóng SSH và chỉ sử dụng
+web để quản lý VLESS.
+
 **Gói cài cố định** gồm `x-ui-linux-amd64.tar.gz`, `x-ui-linux-arm64.tar.gz`
 và `SHA256SUMS`. Bạn có thể tải cả ba về máy để lưu dự phòng một lần, phòng khi
 GitHub không truy cập được sau này. Không cần sử dụng chức năng nâng cấp.
