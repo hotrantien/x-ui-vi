@@ -1,0 +1,84 @@
+name: Dong goi va phat hanh x-ui VI
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  linux-bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache: true
+      - name: Kiem tra dong goi
+        shell: bash
+        run: bash scripts/packaging/test-assembly.sh
+      - name: Build native va smoke test SQLite CGO
+        shell: bash
+        run: |
+          bash scripts/packaging/build.sh --arch "${{ matrix.arch }}" \
+            --xray "bin/xray-linux-${{ matrix.arch }}" \
+            --geoip bin/geoip.dat --geosite bin/geosite.dat \
+            --output-dir dist
+      - name: Xac minh tarball
+        shell: bash
+        run: |
+          bash scripts/packaging/verify.sh \
+            --archive "dist/x-ui-linux-${{ matrix.arch }}.tar.gz" \
+            --arch "${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x-ui-linux-${{ matrix.arch }}
+          path: dist/x-ui-linux-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
+  github-release:
+    name: Phat hanh tren repo nay
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: linux-bundle
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: x-ui-linux-*
+          merge-multiple: true
+          path: dist
+      - name: Tao SHA256SUMS
+        shell: bash
+        run: |
+          cd dist
+          test -s x-ui-linux-amd64.tar.gz
+          test -s x-ui-linux-arm64.tar.gz
+          sha256sum x-ui-linux-amd64.tar.gz x-ui-linux-arm64.tar.gz > SHA256SUMS
+      - name: Tao GitHub Release tren chinh repo cua minh
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            dist/x-ui-linux-amd64.tar.gz \
+            dist/x-ui-linux-arm64.tar.gz \
+            dist/SHA256SUMS \
+            --repo "$GH_REPO" \
+            --title "x-ui VI $RELEASE_TAG" \
+            --notes "Ban Viet hoa, bo cai doc lap. Chua Xray va geoip/geosite, khong tai tu repo goc khi cai/cap nhat. Kiem tra SHA256 truoc khi su dung."

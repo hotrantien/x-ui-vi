@@ -1,0 +1,13 @@
+[Unit]
+Description=x-ui Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+UMask=0077
+WorkingDirectory=/usr/local/x-ui/
+ExecStart=/usr/local/x-ui/x-ui
+
+[Install]
+WantedBy=multi-user.target
